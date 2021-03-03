@@ -40,28 +40,25 @@ This lab will guide you through a step-by-step process into developing such a mo
 
 ```python
 # import necessary libraries
-from pyspark.sql import SparkSession
+
 
 # instantiate SparkSession object
-# spark = SparkSession.builder.master('local').getOrCreate()
+# spark = SparkSession.builder.master("local").getOrCreate()
 
-spark = SparkSession\
-        .builder\
-        .appName('ALSExample').config('spark.driver.host', 'localhost')\
-        .getOrCreate()
+
 ```
 
 
 ```python
 # read in the dataset into pyspark DataFrame
-movie_ratings = spark.read.csv('./data/ratings.csv', header='true', inferSchema='true')
+movie_ratings = None
 ```
 
 Check the data types of each of the columns to ensure that they are a type that makes sense given the column.
 
 
 ```python
-movie_ratings.dtypes
+
 ```
 
 
@@ -78,7 +75,7 @@ We aren't going to need the timestamp, so we can go ahead and remove that column
 
 
 ```python
-movie_ratings = movie_ratings.drop('timestamp')
+movie_ratings = None
 ```
 
 ### Fitting the Alternating Least Squares Model
@@ -93,18 +90,16 @@ Because this dataset is already preprocessed for us, we can go ahead and fit the
 ```python
 from pyspark.ml.evaluation import RegressionEvaluator
 
-from pyspark.ml.recommendation import ALS
+from pyspark.ml.recommendation import ALS 
 
 # split into training and testing sets
-(training, test) = movie_ratings.randomSplit([0.8, 0.2])
+
 
 # Build the recommendation model using ALS on the training data
 # Note we set cold start strategy to 'drop' to ensure we don't get NaN evaluation metrics
-als = ALS(maxIter=5,rank=4, regParam=0.01, userCol='userId', itemCol='movieId', ratingCol='rating',
-          coldStartStrategy='drop')
 
 # fit the ALS model to the training set
-model = als.fit(training)
+
 ```
 
 Now you've fit the model, and it's time to evaluate it to determine just how well it performed.
@@ -116,14 +111,10 @@ Now you've fit the model, and it's time to evaluate it to determine just how wel
 
 ```python
 # importing appropriate library
-from pyspark.ml.evaluation import RegressionEvaluator
+
 
 # Evaluate the model by computing the RMSE on the test data
-predictions = model.transform(test)
-evaluator = RegressionEvaluator(metricName='rmse', labelCol='rating',
-                                predictionCol='prediction')
-rmse = evaluator.evaluate(predictions)
-print('Root-mean-square error = ' + str(rmse))
+
 ```
 
     Root-mean-square error = 0.9968853671625669
@@ -142,21 +133,16 @@ Let's now find the optimal values for the parameters of the ALS model. Use the b
 from pyspark.ml.tuning import CrossValidator, ParamGridBuilder
 
 # initialize the ALS model
-als_model = ALS(userCol='userId', itemCol='movieId', 
-                ratingCol='rating', coldStartStrategy='drop')
 
-# create the parameter grid                 
-params = ParamGridBuilder()\
-          .addGrid(als_model.regParam, [0.01, 0.001, 0.1])\
-          .addGrid(als_model.rank, [4, 10, 50]).build()
+
+# create the parameter grid              
 
 
 # instantiating crossvalidator estimator
-cv = CrossValidator(estimator=als_model, estimatorParamMaps=params,evaluator=evaluator,parallelism=4)
-best_model = cv.fit(movie_ratings)    
+
 
 # We see the best model has a rank of 50, so we will use that in our future models with this dataset
-best_model.bestModel.rank
+
 ```
 
 ### Incorporating the names of the movies
@@ -168,7 +154,7 @@ When we make recommendations, it would be ideal if we could have the actual name
 
 
 ```python
-movie_titles = spark.read.csv('./data/movies.csv',header='true',inferSchema='true')
+movie_titles = None
 
 movie_titles.head(5)
 ```
@@ -191,7 +177,7 @@ We will eventually be matching up the movie ids with the movie titles. In the ce
 
 ```python
 def name_retriever(movie_id, movie_title_df):
-    return movie_title_df.where(movie_title_df.movieId == movie_id).take(1)[0]['title']
+    pass
 ```
 
 
@@ -273,45 +259,28 @@ Row(movieId=370, title='Naked Gun 33 1/3: The Final Insult (1994)', genres='Acti
 ```python
 def new_user_recs(user_id, new_ratings, rating_df, movie_title_df, num_recs):
     # turn the new_recommendations list into a spark DataFrame
-    new_user_ratings = spark.createDataFrame(new_ratings,rating_df.columns)
+    
     
     # combine the new ratings df with the rating_df
-    movie_ratings_combined = rating_df.union(new_user_ratings)
-    
-    # split the dataframe into a train and test set
-#     (training, test) = movie_ratings_combined.randomSplit([0.8, 0.2],seed=0)
+  
     
     # create an ALS model and fit it
-    als = ALS(maxIter=5,rank=50, regParam=0.01, userCol="userId", itemCol="movieId", ratingCol="rating",
-          coldStartStrategy="drop")
-    model = als.fit(movie_ratings_combined)
+
     
     # make recommendations for all users using the recommendForAllUsers method
-    recommendations = model.recommendForAllUsers(num_recs)
+
     
     # get recommendations specifically for the new user that has been added to the DataFrame
-    recs_for_user = recommendations.where(recommendations.userId == user_id).take(1)
-    
-    for ranking, (movie_id, rating) in enumerate(recs_for_user[0]['recommendations']):
-        movie_string = name_retriever(movie_id,movie_title_df)
-        print('Recommendation {}: {}  | predicted score :{}'.format(ranking+1,movie_string,rating))
+    pass
         
 ```
 
 
 ```python
-user_id = 100000
-user_ratings_1 = [(user_id,3253,5),
-                  (user_id,2459,5),
-                  (user_id,2513,4),
-                  (user_id,6502,5),
-                  (user_id,1091,5),
-                  (user_id,441,4)]
-new_user_recs(user_id,
-             new_ratings=user_ratings_1,
-             rating_df=movie_ratings,
-             movie_title_df=movie_titles,
-             num_recs = 10)
+# try out your function with the movies listed above
+
+
+
 ```
 
     Recommendation 1: Star Wars: Episode IV - A New Hope (1977)  | predicted score :5.517341136932373
